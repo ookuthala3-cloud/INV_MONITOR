@@ -19,24 +19,53 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install PlatformIO
+      - name: Install PlatformIO and esptool
         run: |
           python -m pip install --upgrade pip
-          pip install platformio
+          pip install platformio esptool
 
       - name: Build firmware
         run: |
-          pio run -e esp32-s3-devkitc-1
+          pio run -e esp32-s3-inverter
+
+      - name: Show build files
+        run: |
+          ls -lah .pio/build/esp32-s3-inverter/
+
+      - name: Create merged firmware
+        run: |
+          python -m esptool \
+            --chip esp32s3 \
+            merge-bin \
+            -o .pio/build/esp32-s3-inverter/INV_MONITOR_MERGED.bin \
+            --flash-mode qio \
+            --flash-size 16MB \
+            0x0000 .pio/build/esp32-s3-inverter/bootloader.bin \
+            0x8000 .pio/build/esp32-s3-inverter/partitions.bin \
+            0x10000 .pio/build/esp32-s3-inverter/firmware.bin
 
       - name: Prepare firmware files
         run: |
           mkdir -p firmware
-          cp .pio/build/esp32-s3-devkitc-1/firmware.bin firmware/INV_MONITOR.bin
-          cp .pio/build/esp32-s3-devkitc-1/bootloader.bin firmware/bootloader.bin
-          cp .pio/build/esp32-s3-devkitc-1/partitions.bin firmware/partitions.bin
+
+          cp .pio/build/esp32-s3-inverter/firmware.bin \
+            firmware/INV_MONITOR.bin
+
+          cp .pio/build/esp32-s3-inverter/bootloader.bin \
+            firmware/bootloader.bin
+
+          cp .pio/build/esp32-s3-inverter/partitions.bin \
+            firmware/partitions.bin
+
+          cp .pio/build/esp32-s3-inverter/INV_MONITOR_MERGED.bin \
+            firmware/INV_MONITOR_MERGED.bin
+
+          echo "===== Firmware Files ====="
+          ls -lah firmware/
 
       - name: Upload firmware
         uses: actions/upload-artifact@v4
         with:
           name: INV_MONITOR-Firmware
           path: firmware/
+          if-no-files-found: error
