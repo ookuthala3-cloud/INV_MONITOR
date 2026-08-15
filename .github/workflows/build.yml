@@ -26,41 +26,42 @@ jobs:
 
       - name: Build firmware
         run: |
-          pio run -e esp32-s3-inverter
+          pio run -e esp32-s3-devkitc-1
 
       - name: Show build files
         run: |
-          ls -lah .pio/build/esp32-s3-inverter/
+          echo "===== BUILD FILES ====="
+          ls -lah .pio/build/esp32-s3-devkitc-1/
 
       - name: Create merged firmware
         run: |
           python -m esptool \
             --chip esp32s3 \
             merge-bin \
-            -o .pio/build/esp32-s3-inverter/INV_MONITOR_MERGED.bin \
+            -o .pio/build/esp32-s3-devkitc-1/INV_MONITOR_MERGED.bin \
             --flash-mode qio \
             --flash-size 16MB \
-            0x0000 .pio/build/esp32-s3-inverter/bootloader.bin \
-            0x8000 .pio/build/esp32-s3-inverter/partitions.bin \
-            0x10000 .pio/build/esp32-s3-inverter/firmware.bin
+            0x0000 .pio/build/esp32-s3-devkitc-1/bootloader.bin \
+            0x8000 .pio/build/esp32-s3-devkitc-1/partitions.bin \
+            0x10000 .pio/build/esp32-s3-devkitc-1/firmware.bin
 
       - name: Prepare firmware files
         run: |
           mkdir -p firmware
 
-          cp .pio/build/esp32-s3-inverter/firmware.bin \
+          cp .pio/build/esp32-s3-devkitc-1/firmware.bin \
             firmware/INV_MONITOR.bin
 
-          cp .pio/build/esp32-s3-inverter/bootloader.bin \
+          cp .pio/build/esp32-s3-devkitc-1/bootloader.bin \
             firmware/bootloader.bin
 
-          cp .pio/build/esp32-s3-inverter/partitions.bin \
+          cp .pio/build/esp32-s3-devkitc-1/partitions.bin \
             firmware/partitions.bin
 
-          cp .pio/build/esp32-s3-inverter/INV_MONITOR_MERGED.bin \
+          cp .pio/build/esp32-s3-devkitc-1/INV_MONITOR_MERGED.bin \
             firmware/INV_MONITOR_MERGED.bin
 
-          echo "===== Firmware Files ====="
+          echo "===== FINAL FIRMWARE ====="
           ls -lah firmware/
 
       - name: Upload firmware
