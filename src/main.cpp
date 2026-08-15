@@ -79,7 +79,7 @@ void setup()
         10,
         48,
         220,
-        ST77XX_DARKGREY
+        tft.color565(80, 80, 80)
     );
 
 
