@@ -1,143 +1,70 @@
 #include <Arduino.h>
-#include <SPI.h>
-#include <Adafruit_GFX.h>
-#include <Adafruit_ST7789.h>
+#include <TFT_eSPI.h>
 
-#include "pins.h"
-
-// Custom SPI bus
-SPIClass displaySPI(FSPI);
-
-// ST7789 display
-Adafruit_ST7789 tft =
-    Adafruit_ST7789(&displaySPI, TFT_CS, TFT_DC, TFT_RST);
-
+TFT_eSPI tft = TFT_eSPI();
 
 void setup()
 {
     Serial.begin(115200);
-
-    delay(1000);
+    delay(500);
 
     Serial.println();
-    Serial.println("================================");
-    Serial.println(" ESP32-S3 INVERTER MONITOR");
-    Serial.println(" ST7789 Display Test");
-    Serial.println("================================");
+    Serial.println("=== INV_MONITOR TFT_eSPI TEST ===");
 
-
-    // -----------------------------
-    // Backlight
-    // -----------------------------
-
-    pinMode(TFT_BL, OUTPUT);
-    digitalWrite(TFT_BL, HIGH);
-
-
-    // -----------------------------
-    // SPI
-    // SCLK, MISO, MOSI, SS
-    // -----------------------------
-
-    displaySPI.begin(
-        TFT_SCLK,
-        -1,
-        TFT_MOSI,
-        TFT_CS
-    );
-
-
-    // -----------------------------
-    // ST7789 240x240
-    // -----------------------------
-
-    tft.init(240, 240);
-
+    tft.init();
     tft.setRotation(0);
 
-    tft.fillScreen(ST77XX_BLACK);
+    Serial.println("TFT initialized");
 
+    // BLACK
+    tft.fillScreen(TFT_BLACK);
+    tft.setTextColor(TFT_WHITE, TFT_BLACK);
+    tft.setTextDatum(MC_DATUM);
 
-    // -----------------------------
-    // Header
-    // -----------------------------
-
-    tft.setTextWrap(false);
-
-    tft.setTextColor(ST77XX_CYAN);
-    tft.setTextSize(2);
-
-    tft.setCursor(26, 20);
-    tft.println("INV MONITOR");
-
-
-    // -----------------------------
-    // Divider
-    // -----------------------------
-
-    tft.drawFastHLine(
-        10,
-        48,
-        220,
-        tft.color565(80, 80, 80)
+    tft.drawString(
+        "INV_MONITOR",
+        120,
+        70,
+        4
     );
 
-
-    // -----------------------------
-    // Display test
-    // -----------------------------
-
-    tft.setTextColor(ST77XX_WHITE);
-    tft.setTextSize(2);
-
-    tft.setCursor(25, 75);
-    tft.println("ST7789 240x240");
-
-
-    tft.setTextColor(ST77XX_GREEN);
-
-    tft.setCursor(55, 110);
-    tft.println("DISPLAY");
-
-
-    tft.setCursor(75, 140);
-    tft.println("OK");
-
-
-    // -----------------------------
-    // RGB test
-    // -----------------------------
-
-    tft.fillRect(
-        35,
-        185,
-        50,
-        25,
-        ST77XX_RED
+    tft.setTextColor(TFT_CYAN, TFT_BLACK);
+    tft.drawString(
+        "ESP32-S3",
+        120,
+        110,
+        2
     );
 
-    tft.fillRect(
-        95,
-        185,
-        50,
-        25,
-        ST77XX_GREEN
+    tft.setTextColor(TFT_GREEN, TFT_BLACK);
+    tft.drawString(
+        "ST7789 240x240",
+        120,
+        140,
+        2
     );
 
-    tft.fillRect(
-        155,
-        185,
-        50,
-        25,
-        ST77XX_BLUE
+    tft.setTextColor(TFT_YELLOW, TFT_BLACK);
+    tft.drawString(
+        "TFT_eSPI OK",
+        120,
+        175,
+        2
     );
 
+    // Border
+    tft.drawRoundRect(
+        5,
+        5,
+        230,
+        230,
+        12,
+        TFT_BLUE
+    );
 
-    Serial.println("Display initialized.");
+    Serial.println("Display test completed");
 }
-
 
 void loop()
 {
-    // Display test only
 }
