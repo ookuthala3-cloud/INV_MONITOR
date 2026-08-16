@@ -65,6 +65,20 @@ uint32_t lastPowerSample = 0;
 float powerMaxSeen = 0.0f;
 float powerAvg = 0.0f;
 
+// ---------- Page 6 Weather Station demo data ----------
+float weatherTempDisp = 0.0f;
+float weatherTempTarget = 31.0f;
+float weatherHumidityDisp = 0.0f;
+float weatherHumidityTarget = 76.0f;
+float weatherPressureDisp = 0.0f;
+float weatherPressureTarget = 1008.0f;
+float weatherWindDisp = 0.0f;
+float weatherWindTarget = 3.4f;
+
+const char* weatherCity = "EAINME";
+const char* weatherText = "PARTLY CLOUDY";
+const char* weatherDay  = "MONDAY";
+
 static inline float smoothTo(float current, float target, float k = 0.14f) {
   return current + (target - current) * k;
 }
@@ -811,12 +825,133 @@ void drawPage5() {
   ui.pushSprite(0, 0);
 }
 
+void drawSunCloudIcon(int cx, int cy) {
+  ui.fillCircle(cx - 18, cy - 10, 12, C_YELLOW);
+
+  for (int a = 0; a < 360; a += 45) {
+    float r = a * 0.01745329252f;
+    int x1 = cx - 18 + (int)(cosf(r) * 16);
+    int y1 = cy - 10 + (int)(sinf(r) * 16);
+    int x2 = cx - 18 + (int)(cosf(r) * 21);
+    int y2 = cy - 10 + (int)(sinf(r) * 21);
+    ui.drawLine(x1, y1, x2, y2, C_YELLOW);
+  }
+
+  ui.fillCircle(cx + 2,  cy + 3, 12, C_WHITE);
+  ui.fillCircle(cx + 16, cy - 1, 15, C_WHITE);
+  ui.fillCircle(cx + 30, cy + 5, 11, C_WHITE);
+  ui.fillRoundRect(cx - 8, cy + 3, 48, 17, 8, C_WHITE);
+  ui.drawFastHLine(cx - 5, cy + 20, 43, C_GRID);
+}
+
+void drawWeatherMetric(int x, int y, int w,
+                       const char *label,
+                       const char *value,
+                       uint16_t color) {
+  ui.fillRoundRect(x, y, w, 38, 5, C_PANEL);
+  ui.drawRoundRect(x, y, w, 38, 5, C_GRID);
+
+  ui.setTextDatum(MC_DATUM);
+  ui.setTextFont(1);
+  ui.setTextColor(C_MUTED, C_PANEL);
+  ui.drawString(label, x + w / 2, y + 9);
+
+  ui.setTextFont(2);
+  ui.setTextColor(color, C_PANEL);
+  ui.drawString(value, x + w / 2, y + 25);
+}
+
+void drawPage6() {
+  ui.fillSprite(C_BG);
+  ui.drawRoundRect(3, 3, 234, 234, 10, C_BLUE);
+
+  ui.setTextDatum(TL_DATUM);
+  ui.setTextFont(2);
+  ui.setTextColor(C_WHITE, C_BG);
+  ui.drawString("WEATHER STATION", 10, 9);
+
+  ui.setTextDatum(TR_DATUM);
+  ui.setTextFont(1);
+  ui.setTextColor(C_MUTED, C_BG);
+  ui.drawString("6 / 6", 229, 11);
+
+  ui.drawFastHLine(8, 27, 224, C_GRID);
+
+  ui.setTextDatum(TL_DATUM);
+  ui.setTextFont(1);
+  ui.setTextColor(C_MUTED, C_BG);
+  ui.drawString(weatherDay, 12, 35);
+
+  ui.setTextDatum(TR_DATUM);
+  ui.setTextColor(C_BLUE, C_BG);
+  ui.drawString(weatherCity, 228, 35);
+
+  drawSunCloudIcon(63, 78);
+
+  char buf[32];
+
+  ui.setTextDatum(TR_DATUM);
+  ui.setTextFont(4);
+  ui.setTextColor(C_YELLOW, C_BG);
+  snprintf(buf, sizeof(buf), "%.1f", weatherTempDisp);
+  ui.drawString(buf, 226, 57);
+
+  ui.setTextFont(2);
+  ui.setTextColor(C_WHITE, C_BG);
+  ui.drawString("C", 226, 86);
+
+  ui.setTextDatum(MC_DATUM);
+  ui.setTextFont(1);
+  ui.setTextColor(C_GREEN, C_BG);
+  ui.drawString(weatherText, 120, 116);
+
+  ui.drawFastHLine(8, 128, 224, C_GRID);
+
+  snprintf(buf, sizeof(buf), "%.0f%%", weatherHumidityDisp);
+  drawWeatherMetric(8, 137, 70, "HUMIDITY", buf, C_BLUE);
+
+  snprintf(buf, sizeof(buf), "%.0f", weatherPressureDisp);
+  drawWeatherMetric(85, 137, 70, "PRESS hPa", buf, C_YELLOW);
+
+  snprintf(buf, sizeof(buf), "%.1f m/s", weatherWindDisp);
+  drawWeatherMetric(162, 137, 70, "WIND", buf, C_GREEN);
+
+  ui.drawFastHLine(8, 184, 224, C_GRID);
+
+  ui.setTextDatum(TL_DATUM);
+  ui.setTextFont(1);
+  ui.setTextColor(C_MUTED, C_BG);
+  ui.drawString("SOURCE", 12, 193);
+
+  ui.setTextFont(2);
+  ui.setTextColor(C_BLUE, C_BG);
+  ui.drawString("ONLINE WEATHER", 12, 205);
+
+  ui.setTextDatum(TR_DATUM);
+  ui.setTextFont(1);
+  ui.setTextColor(C_MUTED, C_BG);
+  ui.drawString("STATUS", 228, 193);
+
+  ui.setTextFont(2);
+  ui.setTextColor(C_GREEN, C_BG);
+  ui.drawString("READY", 228, 205);
+
+  ui.drawFastHLine(8, 224, 224, C_GRID);
+
+  ui.setTextDatum(MC_DATUM);
+  ui.setTextFont(1);
+  ui.setTextColor(C_MUTED, C_BG);
+  ui.drawString("Weather API data will connect later", 120, 232);
+
+  ui.pushSprite(0, 0);
+}
+
 void updatePageManager() {
   uint32_t now = millis();
 
   if (now - lastPageSwitch >= PAGE_INTERVAL) {
     lastPageSwitch = now;
-    currentPage = (currentPage + 1) % 5;
+    currentPage = (currentPage + 1) % 6;
   }
 }
 
@@ -839,6 +974,11 @@ void updateDemoTargets() {
   ambientTempTarget = 29.5f + sinf(t * 0.18f) * 0.6f;
   pressureTarget = 1008.0f + sinf(t * 0.10f) * 2.5f;
 
+  weatherTempTarget = 31.0f + sinf(t * 0.13f) * 1.2f;
+  weatherHumidityTarget = 76.0f + sinf(t * 0.11f) * 4.0f;
+  weatherPressureTarget = 1008.0f + sinf(t * 0.09f) * 2.0f;
+  weatherWindTarget = 3.4f + sinf(t * 0.23f) * 0.8f;
+
   wavePhase += 0.12f;
   if (wavePhase > 6.2831853f) wavePhase -= 6.2831853f;
 }
@@ -855,6 +995,11 @@ void updateAnimations() {
   dischargeDisp = smoothTo(dischargeDisp, dischargeTarget, 0.12f);
   ambientTempDisp = smoothTo(ambientTempDisp, ambientTempTarget, 0.10f);
   pressureDisp = smoothTo(pressureDisp, pressureTarget, 0.08f);
+
+  weatherTempDisp = smoothTo(weatherTempDisp, weatherTempTarget, 0.08f);
+  weatherHumidityDisp = smoothTo(weatherHumidityDisp, weatherHumidityTarget, 0.08f);
+  weatherPressureDisp = smoothTo(weatherPressureDisp, weatherPressureTarget, 0.08f);
+  weatherWindDisp = smoothTo(weatherWindDisp, weatherWindTarget, 0.08f);
 }
 
 void setup() {
@@ -908,6 +1053,11 @@ void setup() {
   ambientTempDisp = 27.0f;
   pressureDisp = 1000.0f;
 
+  weatherTempDisp = 29.0f;
+  weatherHumidityDisp = 70.0f;
+  weatherPressureDisp = 1003.0f;
+  weatherWindDisp = 2.5f;
+
   for (int i = 0; i < POWER_SAMPLES; i++) {
     powerHistory[i] = 500.0f + sinf(i * 0.28f) * 75.0f;
   }
@@ -918,7 +1068,7 @@ void setup() {
   currentPage = 0;
   lastPageSwitch = millis();
 
-  Serial.println("INV_MONITOR Page 1 to Page 5 UI started");
+  Serial.println("INV_MONITOR Page 1 to Page 6 UI started");
   Serial.println("Auto rotate: 15 seconds");
 }
 
@@ -943,8 +1093,10 @@ void loop() {
       drawPage3();
     } else if (currentPage == 3) {
       drawPage4();
-    } else {
+    } else if (currentPage == 4) {
       drawPage5();
+    } else {
+      drawPage6();
     }
   }
 }
