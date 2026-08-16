@@ -58,6 +58,13 @@ uint32_t lastPageSwitch = 0;
 const uint32_t PAGE_INTERVAL = 15000UL;  // 15 seconds
 float wavePhase = 0.0f;
 
+// ---------- Page 5 power graph ----------
+static const int POWER_SAMPLES = 60;
+float powerHistory[POWER_SAMPLES];
+uint32_t lastPowerSample = 0;
+float powerMaxSeen = 0.0f;
+float powerAvg = 0.0f;
+
 static inline float smoothTo(float current, float target, float k = 0.14f) {
   return current + (target - current) * k;
 }
@@ -649,12 +656,167 @@ void drawPage4() {
   ui.pushSprite(0, 0);
 }
 
+void updatePowerHistory() {
+  uint32_t now = millis();
+  if (now - lastPowerSample < 1000UL) return;
+  lastPowerSample = now;
+
+  for (int i = 0; i < POWER_SAMPLES - 1; i++) {
+    powerHistory[i] = powerHistory[i + 1];
+  }
+  powerHistory[POWER_SAMPLES - 1] = wDisp;
+
+  float sum = 0.0f;
+  powerMaxSeen = 0.0f;
+  for (int i = 0; i < POWER_SAMPLES; i++) {
+    sum += powerHistory[i];
+    if (powerHistory[i] > powerMaxSeen) powerMaxSeen = powerHistory[i];
+  }
+  powerAvg = sum / POWER_SAMPLES;
+}
+
+void drawPowerGraph(int x, int y, int w, int h) {
+  const float graphMax = 1000.0f;
+
+  ui.drawRoundRect(x, y, w, h, 4, C_GRID);
+
+  // Horizontal grid: 0, 250, 500, 750, 1000 W
+  for (int i = 0; i <= 4; i++) {
+    int gy = y + 3 + ((h - 6) * i) / 4;
+    ui.drawFastHLine(x + 3, gy, w - 6, C_GRID);
+  }
+
+  // Vertical time grid
+  for (int i = 1; i < 4; i++) {
+    int gx = x + (w * i) / 4;
+    for (int yy = y + 4; yy < y + h - 3; yy += 4) {
+      ui.drawPixel(gx, yy, C_GRID);
+    }
+  }
+
+  int prevX = x + 3;
+  float first = clampf(powerHistory[0], 0.0f, graphMax);
+  int prevY = y + h - 4 - (int)((first / graphMax) * (h - 8));
+
+  for (int i = 1; i < POWER_SAMPLES; i++) {
+    int px = x + 3 + (i * (w - 7)) / (POWER_SAMPLES - 1);
+    float val = clampf(powerHistory[i], 0.0f, graphMax);
+    int py = y + h - 4 - (int)((val / graphMax) * (h - 8));
+
+    // subtle vertical fill
+    for (int fy = py + 3; fy < y + h - 4; fy += 5) {
+      ui.drawPixel(px, fy, C_PANEL);
+    }
+
+    // vivid orange trace, doubled for visibility
+    ui.drawLine(prevX, prevY, px, py, C_ORANGE);
+    ui.drawLine(prevX, prevY + 1, px, py + 1, C_ORANGE);
+
+    prevX = px;
+    prevY = py;
+  }
+}
+
+void drawPage5() {
+  ui.fillSprite(C_BG);
+  ui.drawRoundRect(3, 3, 234, 234, 10, C_ORANGE);
+
+  // Header
+  ui.setTextDatum(TL_DATUM);
+  ui.setTextFont(2);
+  ui.setTextColor(C_WHITE, C_BG);
+  ui.drawString("POWER GRAPH", 10, 9);
+
+  ui.setTextDatum(TR_DATUM);
+  ui.setTextFont(1);
+  ui.setTextColor(C_MUTED, C_BG);
+  ui.drawString("5 / 5", 229, 11);
+  ui.drawFastHLine(8, 27, 224, C_GRID);
+
+  char buf[24];
+
+  // Current power
+  ui.setTextDatum(TL_DATUM);
+  ui.setTextFont(1);
+  ui.setTextColor(C_MUTED, C_BG);
+  ui.drawString("LIVE POWER", 12, 35);
+
+  ui.setTextFont(4);
+  ui.setTextColor(C_ORANGE, C_BG);
+  snprintf(buf, sizeof(buf), "%.0f", wDisp);
+  ui.drawString(buf, 12, 48);
+
+  int numberWidth = ui.textWidth(buf);
+  ui.setTextFont(2);
+  ui.setTextColor(C_WHITE, C_BG);
+  ui.drawString("W", 18 + numberWidth, 59);
+
+  // Max / Average
+  ui.setTextDatum(TR_DATUM);
+  ui.setTextFont(1);
+  ui.setTextColor(C_MUTED, C_BG);
+  ui.drawString("MAX", 226, 36);
+  ui.setTextFont(2);
+  ui.setTextColor(C_RED, C_BG);
+  snprintf(buf, sizeof(buf), "%.0f W", powerMaxSeen);
+  ui.drawString(buf, 226, 47);
+
+  ui.setTextFont(1);
+  ui.setTextColor(C_MUTED, C_BG);
+  ui.drawString("AVG", 226, 64);
+  ui.setTextFont(2);
+  ui.setTextColor(C_GREEN, C_BG);
+  snprintf(buf, sizeof(buf), "%.0f W", powerAvg);
+  ui.drawString(buf, 226, 75);
+
+  // Graph
+  drawPowerGraph(29, 94, 198, 91);
+
+  // Y-axis labels
+  ui.setTextDatum(TR_DATUM);
+  ui.setTextFont(1);
+  ui.setTextColor(C_MUTED, C_BG);
+  ui.drawString("1000", 26, 94);
+  ui.drawString("750", 26, 115);
+  ui.drawString("500", 26, 137);
+  ui.drawString("250", 26, 159);
+  ui.drawString("0", 26, 178);
+
+  // Time labels
+  ui.setTextDatum(MC_DATUM);
+  ui.setTextFont(1);
+  ui.setTextColor(C_MUTED, C_BG);
+  ui.drawString("-60s", 32, 194);
+  ui.drawString("-45s", 79, 194);
+  ui.drawString("-30s", 128, 194);
+  ui.drawString("-15s", 177, 194);
+  ui.drawString("0s", 220, 194);
+
+  ui.drawFastHLine(8, 207, 224, C_GRID);
+
+  // Range selector look
+  ui.setTextDatum(MC_DATUM);
+  ui.setTextFont(1);
+  ui.setTextColor(C_ORANGE, C_BG);
+  ui.drawString("LIVE", 34, 221);
+
+  ui.setTextColor(C_MUTED, C_BG);
+  ui.drawString("1H", 82, 221);
+  ui.drawString("6H", 126, 221);
+  ui.drawString("12H", 171, 221);
+  ui.drawString("24H", 216, 221);
+
+  ui.drawFastHLine(17, 231, 34, C_ORANGE);
+
+  ui.pushSprite(0, 0);
+}
+
 void updatePageManager() {
   uint32_t now = millis();
 
   if (now - lastPageSwitch >= PAGE_INTERVAL) {
     lastPageSwitch = now;
-    currentPage = (currentPage + 1) % 4;
+    currentPage = (currentPage + 1) % 5;
   }
 }
 
@@ -746,10 +908,17 @@ void setup() {
   ambientTempDisp = 27.0f;
   pressureDisp = 1000.0f;
 
+  for (int i = 0; i < POWER_SAMPLES; i++) {
+    powerHistory[i] = 500.0f + sinf(i * 0.28f) * 75.0f;
+  }
+  lastPowerSample = millis();
+  powerMaxSeen = 575.0f;
+  powerAvg = 500.0f;
+
   currentPage = 0;
   lastPageSwitch = millis();
 
-  Serial.println("INV_MONITOR Page 1 + Page 2 + Page 3 + Page 4 UI started");
+  Serial.println("INV_MONITOR Page 1 to Page 5 UI started");
   Serial.println("Auto rotate: 15 seconds");
 }
 
@@ -757,6 +926,7 @@ void loop() {
   static uint32_t lastFrame = 0;
 
   updatePageManager();
+  updatePowerHistory();
 
   // ~20 FPS
   if (millis() - lastFrame >= 50) {
@@ -771,8 +941,10 @@ void loop() {
       drawPage2();
     } else if (currentPage == 2) {
       drawPage3();
-    } else {
+    } else if (currentPage == 3) {
       drawPage4();
+    } else {
+      drawPage5();
     }
   }
 }
