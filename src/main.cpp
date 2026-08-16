@@ -46,6 +46,12 @@ float battAvgV = 12.5f;
 float dischargeDisp = 0.0f;
 float dischargeTarget = 5.6f;
 
+// ---------- Page 4 demo environment values ----------
+float ambientTempDisp = 0.0f;
+float ambientTempTarget = 29.5f;
+float pressureDisp = 0.0f;
+float pressureTarget = 1008.0f;
+
 // ---------- Page manager ----------
 uint8_t currentPage = 0;
 uint32_t lastPageSwitch = 0;
@@ -517,12 +523,138 @@ void drawPage3() {
   ui.pushSprite(0, 0);
 }
 
+void drawTempBar(int x, int y, int w, int h, float tempC) {
+  // 0..80 C display range
+  float p = clampf(tempC / 80.0f, 0.0f, 1.0f);
+
+  ui.drawRoundRect(x, y, w, h, 4, C_GRID);
+
+  int innerW = w - 4;
+  int fillW = (int)(innerW * p);
+
+  // Draw vivid sections according to current temperature.
+  for (int i = 0; i < fillW; i++) {
+    float q = i / (float)innerW;
+    uint16_t c = C_GREEN;
+    if (q >= 0.60f && q < 0.80f) c = C_YELLOW;
+    else if (q >= 0.80f) c = C_RED;
+    ui.drawFastVLine(x + 2 + i, y + 2, h - 4, c);
+  }
+}
+
+void drawPage4() {
+  ui.fillSprite(C_BG);
+
+  ui.drawRoundRect(3, 3, 234, 234, 10, C_ORANGE);
+
+  // Header
+  ui.setTextDatum(TL_DATUM);
+  ui.setTextFont(2);
+  ui.setTextColor(C_WHITE, C_BG);
+  ui.drawString("TEMPERATURE", 10, 9);
+
+  ui.setTextDatum(TR_DATUM);
+  ui.setTextFont(1);
+  ui.setTextColor(C_MUTED, C_BG);
+  ui.drawString("4 / 4", 229, 11);
+
+  ui.drawFastHLine(8, 27, 224, C_GRID);
+
+  // Main inverter temperature gauge
+  const int cx = 120;
+  const int cy = 79;
+  const int r = 43;
+  const float startA = 150.0f;
+  const float endA = 390.0f;
+
+  float tp = clampf(tempDisp / 80.0f, 0.0f, 1.0f);
+  uint16_t tempColor = C_GREEN;
+  if (tempDisp >= 60.0f) tempColor = C_RED;
+  else if (tempDisp >= 45.0f) tempColor = C_YELLOW;
+
+  drawArcSegment(ui, cx, cy, r, 9, startA, endA, C_GRID);
+  drawArcSegment(ui, cx, cy, r, 9, startA,
+                 startA + (endA - startA) * tp, tempColor);
+
+  char buf[28];
+
+  ui.setTextDatum(MC_DATUM);
+  ui.setTextFont(4);
+  ui.setTextColor(tempColor, C_BG);
+  snprintf(buf, sizeof(buf), "%.1f", tempDisp);
+  ui.drawString(buf, cx, cy - 5);
+
+  ui.setTextFont(2);
+  ui.setTextColor(C_WHITE, C_BG);
+  ui.drawString("C", cx, cy + 20);
+
+  ui.setTextFont(1);
+  ui.setTextColor(C_MUTED, C_BG);
+  ui.drawString("INVERTER TEMP", cx, 122);
+
+  ui.drawFastHLine(8, 134, 224, C_GRID);
+
+  // Ambient temperature
+  ui.setTextDatum(TL_DATUM);
+  ui.setTextFont(1);
+  ui.setTextColor(C_MUTED, C_BG);
+  ui.drawString("AMBIENT", 13, 143);
+
+  ui.setTextFont(2);
+  ui.setTextColor(C_BLUE, C_BG);
+  snprintf(buf, sizeof(buf), "%.1f C", ambientTempDisp);
+  ui.drawString(buf, 13, 155);
+
+  // Pressure
+  ui.setTextDatum(TR_DATUM);
+  ui.setTextFont(1);
+  ui.setTextColor(C_MUTED, C_BG);
+  ui.drawString("PRESSURE", 227, 143);
+
+  ui.setTextFont(2);
+  ui.setTextColor(C_YELLOW, C_BG);
+  snprintf(buf, sizeof(buf), "%.0f hPa", pressureDisp);
+  ui.drawString(buf, 227, 155);
+
+  // Temperature range bar
+  ui.setTextDatum(TL_DATUM);
+  ui.setTextFont(1);
+  ui.setTextColor(C_MUTED, C_BG);
+  ui.drawString("TEMPERATURE RANGE", 13, 181);
+
+  drawTempBar(13, 194, 214, 10, tempDisp);
+
+  // Bottom status
+  ui.drawFastHLine(8, 212, 224, C_GRID);
+
+  ui.setTextDatum(TL_DATUM);
+  ui.setTextFont(1);
+  ui.setTextColor(C_MUTED, C_BG);
+  ui.drawString("STATUS", 13, 220);
+
+  ui.setTextDatum(TR_DATUM);
+  ui.setTextFont(2);
+
+  if (tempDisp >= 60.0f) {
+    ui.setTextColor(C_RED, C_BG);
+    ui.drawString("HOT", 226, 217);
+  } else if (tempDisp >= 45.0f) {
+    ui.setTextColor(C_YELLOW, C_BG);
+    ui.drawString("WARM", 226, 217);
+  } else {
+    ui.setTextColor(C_GREEN, C_BG);
+    ui.drawString("NORMAL", 226, 217);
+  }
+
+  ui.pushSprite(0, 0);
+}
+
 void updatePageManager() {
   uint32_t now = millis();
 
   if (now - lastPageSwitch >= PAGE_INTERVAL) {
     lastPageSwitch = now;
-    currentPage = (currentPage + 1) % 3;
+    currentPage = (currentPage + 1) % 4;
   }
 }
 
@@ -541,6 +673,10 @@ void updateDemoTargets() {
 
   // Page 2 demo movement
   dischargeTarget = 5.6f + sinf(t * 0.50f) * 0.8f;
+
+  ambientTempTarget = 29.5f + sinf(t * 0.18f) * 0.6f;
+  pressureTarget = 1008.0f + sinf(t * 0.10f) * 2.5f;
+
   wavePhase += 0.12f;
   if (wavePhase > 6.2831853f) wavePhase -= 6.2831853f;
 }
@@ -555,6 +691,8 @@ void updateAnimations() {
   battVDisp = smoothTo(battVDisp, battVTarget, 0.10f);
   tempDisp = smoothTo(tempDisp, tempTarget, 0.10f);
   dischargeDisp = smoothTo(dischargeDisp, dischargeTarget, 0.12f);
+  ambientTempDisp = smoothTo(ambientTempDisp, ambientTempTarget, 0.10f);
+  pressureDisp = smoothTo(pressureDisp, pressureTarget, 0.08f);
 }
 
 void setup() {
@@ -605,11 +743,13 @@ void setup() {
   battVDisp = 11.8f;
   tempDisp = 32.0f;
   dischargeDisp = 3.0f;
+  ambientTempDisp = 27.0f;
+  pressureDisp = 1000.0f;
 
   currentPage = 0;
   lastPageSwitch = millis();
 
-  Serial.println("INV_MONITOR Page 1 + Page 2 + Page 3 UI started");
+  Serial.println("INV_MONITOR Page 1 + Page 2 + Page 3 + Page 4 UI started");
   Serial.println("Auto rotate: 15 seconds");
 }
 
@@ -629,8 +769,10 @@ void loop() {
       drawPage1();
     } else if (currentPage == 1) {
       drawPage2();
-    } else {
+    } else if (currentPage == 2) {
       drawPage3();
+    } else {
+      drawPage4();
     }
   }
 }
