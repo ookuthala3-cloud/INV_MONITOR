@@ -50,6 +50,7 @@ float dischargeTarget = 5.6f;
 uint8_t currentPage = 0;
 uint32_t lastPageSwitch = 0;
 const uint32_t PAGE_INTERVAL = 15000UL;  // 15 seconds
+float wavePhase = 0.0f;
 
 static inline float smoothTo(float current, float target, float k = 0.14f) {
   return current + (target - current) * k;
@@ -347,12 +348,6 @@ void drawPage2() {
 
   ui.drawFastHLine(8, 27, 224, C_GRID);
 
-  // ---------- Title ----------
-  ui.setTextDatum(MC_DATUM);
-  ui.setTextFont(2);
-  ui.setTextColor(C_GREEN, C_BG);
-  ui.drawString("BATTERY", 120, 38);
-
   // ---------- Main battery gauge ----------
   drawBatteryGaugeLarge(battDisp, battVDisp);
 
@@ -399,12 +394,135 @@ void drawPage2() {
   ui.pushSprite(0, 0);
 }
 
+void drawMiniWaveform(int x, int y, int w, int h) {
+  ui.drawRoundRect(x, y, w, h, 4, C_GRID);
+
+  // center line
+  int midY = y + h / 2;
+  ui.drawFastHLine(x + 3, midY, w - 6, C_GRID);
+
+  // faint vertical grid
+  for (int gx = x + 18; gx < x + w; gx += 18) {
+    ui.drawFastVLine(gx, y + 3, h - 6, C_PANEL);
+  }
+
+  // sine waveform
+  int prevX = x + 3;
+  int prevY = midY;
+  for (int px = 1; px < w - 6; px++) {
+    float a = (px / (float)(w - 6)) * 6.2831853f * 1.7f + wavePhase;
+    int py = midY + (int)(sinf(a) * (h * 0.30f));
+    int xx = x + 3 + px;
+    ui.drawLine(prevX, prevY, xx, py, C_BLUE);
+    prevX = xx;
+    prevY = py;
+  }
+}
+
+void drawACValue(int x, int y, const char *label,
+                 const char *value, uint16_t color) {
+  ui.setTextDatum(TL_DATUM);
+  ui.setTextFont(1);
+  ui.setTextColor(C_MUTED, C_BG);
+  ui.drawString(label, x, y);
+
+  ui.setTextFont(2);
+  ui.setTextColor(color, C_BG);
+  ui.drawString(value, x, y + 11);
+}
+
+void drawPage3() {
+  ui.fillSprite(C_BG);
+
+  // outer card
+  ui.drawRoundRect(3, 3, 234, 234, 10, C_BLUE);
+
+  // ---------- Header ----------
+  ui.setTextDatum(TL_DATUM);
+  ui.setTextFont(2);
+  ui.setTextColor(C_WHITE, C_BG);
+  ui.drawString("AC DETAILS", 10, 9);
+
+  ui.setTextDatum(TR_DATUM);
+  ui.setTextFont(1);
+  ui.setTextColor(C_MUTED, C_BG);
+  ui.drawString("3 / 3", 229, 11);
+
+  ui.drawFastHLine(8, 27, 224, C_GRID);
+
+  char buf[24];
+
+  // ---------- Left column ----------
+  snprintf(buf, sizeof(buf), "%.1f V", vDisp);
+  drawACValue(12, 38, "VOLTAGE (RMS)", buf, C_BLUE);
+
+  snprintf(buf, sizeof(buf), "%.2f A", aDisp);
+  drawACValue(12, 72, "CURRENT (RMS)", buf, C_GREEN);
+
+  snprintf(buf, sizeof(buf), "%.0f W", wDisp);
+  drawACValue(12, 106, "POWER", buf, C_ORANGE);
+
+  snprintf(buf, sizeof(buf), "%.2f", pfDisp);
+  drawACValue(12, 140, "POWER FACTOR", buf, C_YELLOW);
+
+  // vertical divider
+  ui.drawFastVLine(112, 35, 137, C_GRID);
+
+  // ---------- Right column ----------
+  ui.setTextDatum(TL_DATUM);
+  ui.setTextFont(1);
+  ui.setTextColor(C_MUTED, C_BG);
+  ui.drawString("FREQUENCY", 123, 38);
+
+  ui.setTextFont(2);
+  ui.setTextColor(C_YELLOW, C_BG);
+  snprintf(buf, sizeof(buf), "%.1f Hz", hzDisp);
+  ui.drawString(buf, 123, 49);
+
+  ui.setTextFont(1);
+  ui.setTextColor(C_MUTED, C_BG);
+  ui.drawString("AC WAVEFORM", 123, 74);
+
+  drawMiniWaveform(122, 88, 105, 65);
+
+  // ---------- Load type ----------
+  ui.drawFastHLine(8, 174, 224, C_GRID);
+
+  ui.setTextDatum(TL_DATUM);
+  ui.setTextFont(1);
+  ui.setTextColor(C_MUTED, C_BG);
+  ui.drawString("LOAD TYPE", 12, 184);
+
+  ui.setTextFont(2);
+  ui.setTextColor(C_GREEN, C_BG);
+  ui.drawString("RESISTIVE", 12, 197);
+
+  // ---------- Output status ----------
+  ui.setTextDatum(TR_DATUM);
+  ui.setTextFont(1);
+  ui.setTextColor(C_MUTED, C_BG);
+  ui.drawString("OUTPUT", 226, 184);
+
+  ui.setTextFont(2);
+  ui.setTextColor(C_GREEN, C_BG);
+  ui.drawString("STABLE", 226, 197);
+
+  ui.drawFastHLine(8, 217, 224, C_GRID);
+
+  ui.setTextDatum(MC_DATUM);
+  ui.setTextFont(1);
+  ui.setTextColor(C_MUTED, C_BG);
+  ui.drawString("LIVE AC MONITOR", 120, 226);
+
+  ui.pushSprite(0, 0);
+}
+
 void updatePageManager() {
   uint32_t now = millis();
 
   if (now - lastPageSwitch >= PAGE_INTERVAL) {
     lastPageSwitch = now;
-    currentPage = (currentPage + 1) % 2;
+    currentPage = (currentPage + 1) % 3;
   }
 }
 
@@ -423,6 +541,8 @@ void updateDemoTargets() {
 
   // Page 2 demo movement
   dischargeTarget = 5.6f + sinf(t * 0.50f) * 0.8f;
+  wavePhase += 0.12f;
+  if (wavePhase > 6.2831853f) wavePhase -= 6.2831853f;
 }
 
 void updateAnimations() {
@@ -489,7 +609,7 @@ void setup() {
   currentPage = 0;
   lastPageSwitch = millis();
 
-  Serial.println("INV_MONITOR Page 1 + Page 2 UI started");
+  Serial.println("INV_MONITOR Page 1 + Page 2 + Page 3 UI started");
   Serial.println("Auto rotate: 15 seconds");
 }
 
@@ -507,8 +627,10 @@ void loop() {
 
     if (currentPage == 0) {
       drawPage1();
-    } else {
+    } else if (currentPage == 1) {
       drawPage2();
+    } else {
+      drawPage3();
     }
   }
 }
