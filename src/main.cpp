@@ -39,6 +39,18 @@ float battTarget = 82.0f;
 float battVTarget = 12.6f;
 float tempTarget = 38.0f;
 
+// ---------- Page 2 demo values ----------
+float battMinV = 12.1f;
+float battMaxV = 13.8f;
+float battAvgV = 12.5f;
+float dischargeDisp = 0.0f;
+float dischargeTarget = 5.6f;
+
+// ---------- Page manager ----------
+uint8_t currentPage = 0;
+uint32_t lastPageSwitch = 0;
+const uint32_t PAGE_INTERVAL = 15000UL;  // 15 seconds
+
 static inline float smoothTo(float current, float target, float k = 0.14f) {
   return current + (target - current) * k;
 }
@@ -244,6 +256,158 @@ void drawPage1() {
   ui.pushSprite(0, 0);
 }
 
+void drawInfoCard(int x, int y, int w, int h,
+                  const char *label, float value, uint16_t color) {
+  ui.fillRoundRect(x, y, w, h, 5, C_PANEL);
+  ui.drawRoundRect(x, y, w, h, 5, C_GRID);
+
+  ui.setTextDatum(MC_DATUM);
+  ui.setTextFont(1);
+  ui.setTextColor(C_MUTED, C_PANEL);
+  ui.drawString(label, x + w / 2, y + 8);
+
+  char buf[18];
+  snprintf(buf, sizeof(buf), "%.1f V", value);
+
+  ui.setTextFont(2);
+  ui.setTextColor(color, C_PANEL);
+  ui.drawString(buf, x + w / 2, y + 24);
+}
+
+void drawBatteryGaugeLarge(float percent, float voltage) {
+  percent = clampf(percent, 0.0f, 100.0f);
+
+  const int cx = 120;
+  const int cy = 79;
+  const int r = 45;
+  const float startA = 150.0f;
+  const float endA = 390.0f;
+  const float span = endA - startA;
+
+  drawArcSegment(ui, cx, cy, r, 9, startA, endA, C_GRID);
+
+  float activeEnd = startA + span * (percent / 100.0f);
+  if (activeEnd > startA + 1.0f) {
+    drawArcSegment(ui, cx, cy, r, 9, startA, activeEnd, C_GREEN);
+  }
+
+  char buf[20];
+
+  ui.setTextDatum(MC_DATUM);
+  ui.setTextFont(4);
+  ui.setTextColor(C_GREEN, C_BG);
+  snprintf(buf, sizeof(buf), "%.0f%%", percent);
+  ui.drawString(buf, cx, cy - 4);
+
+  ui.setTextFont(2);
+  ui.setTextColor(C_WHITE, C_BG);
+  snprintf(buf, sizeof(buf), "%.1f V", voltage);
+  ui.drawString(buf, cx, cy + 22);
+}
+
+void drawSegmentBar(int x, int y, int w, int h, float value, float maxValue) {
+  const int segments = 10;
+  const int gap = 2;
+  int segW = (w - gap * (segments - 1)) / segments;
+
+  float p = clampf(value / maxValue, 0.0f, 1.0f);
+  int active = (int)roundf(p * segments);
+
+  for (int i = 0; i < segments; i++) {
+    int sx = x + i * (segW + gap);
+
+    uint16_t color = C_GRID;
+
+    if (i < active) {
+      if (i < 6) color = C_GREEN;
+      else if (i < 8) color = C_YELLOW;
+      else color = C_RED;
+    }
+
+    ui.fillRoundRect(sx, y, segW, h, 2, color);
+  }
+}
+
+void drawPage2() {
+  ui.fillSprite(C_BG);
+
+  // outer card
+  ui.drawRoundRect(3, 3, 234, 234, 10, C_GREEN);
+
+  // ---------- Header ----------
+  ui.setTextDatum(TL_DATUM);
+  ui.setTextColor(C_WHITE, C_BG);
+  ui.setTextFont(2);
+  ui.drawString("BATTERY & DC", 10, 9);
+
+  ui.setTextDatum(TR_DATUM);
+  ui.setTextColor(C_MUTED, C_BG);
+  ui.setTextFont(1);
+  ui.drawString("2 / 2", 229, 11);
+
+  ui.drawFastHLine(8, 27, 224, C_GRID);
+
+  // ---------- Title ----------
+  ui.setTextDatum(MC_DATUM);
+  ui.setTextFont(2);
+  ui.setTextColor(C_GREEN, C_BG);
+  ui.drawString("BATTERY", 120, 38);
+
+  // ---------- Main battery gauge ----------
+  drawBatteryGaugeLarge(battDisp, battVDisp);
+
+  // ---------- Min / Max / Avg cards ----------
+  drawInfoCard(8,   127, 70, 39, "MIN", battMinV, C_BLUE);
+  drawInfoCard(85,  127, 70, 39, "MAX", battMaxV, C_ORANGE);
+  drawInfoCard(162, 127, 70, 39, "AVG", battAvgV, C_GREEN);
+
+  // ---------- Discharge current ----------
+  ui.setTextDatum(TL_DATUM);
+  ui.setTextFont(1);
+  ui.setTextColor(C_MUTED, C_BG);
+  ui.drawString("DISCHARGE CURRENT", 12, 174);
+
+  char buf[20];
+  ui.setTextDatum(TR_DATUM);
+  ui.setTextFont(2);
+  ui.setTextColor(C_BLUE, C_BG);
+  snprintf(buf, sizeof(buf), "%.1f A", dischargeDisp);
+  ui.drawString(buf, 228, 170);
+
+  drawSegmentBar(12, 192, 216, 10, dischargeDisp, 20.0f);
+
+  // ---------- Status ----------
+  ui.drawFastHLine(8, 211, 224, C_GRID);
+
+  drawBattery(12, 218, 28, 12, battDisp);
+
+  ui.setTextDatum(TL_DATUM);
+  ui.setTextFont(1);
+  ui.setTextColor(C_MUTED, C_BG);
+  ui.drawString("STATUS", 49, 218);
+
+  ui.setTextFont(2);
+  ui.setTextColor(C_GREEN, C_BG);
+  ui.drawString("NORMAL", 94, 215);
+
+  ui.fillCircle(218, 223, 7, C_GREEN);
+  ui.setTextDatum(MC_DATUM);
+  ui.setTextFont(1);
+  ui.setTextColor(C_BG, C_GREEN);
+  ui.drawString("OK", 218, 223);
+
+  ui.pushSprite(0, 0);
+}
+
+void updatePageManager() {
+  uint32_t now = millis();
+
+  if (now - lastPageSwitch >= PAGE_INTERVAL) {
+    lastPageSwitch = now;
+    currentPage = (currentPage + 1) % 2;
+  }
+}
+
 void updateDemoTargets() {
   // Small movement so gauge smoothing can be checked.
   float t = millis() * 0.001f;
@@ -256,6 +420,9 @@ void updateDemoTargets() {
   battTarget = 82.0f;
   battVTarget = 12.6f;
   tempTarget = 38.0f + sinf(t * 0.15f) * 0.7f;
+
+  // Page 2 demo movement
+  dischargeTarget = 5.6f + sinf(t * 0.50f) * 0.8f;
 }
 
 void updateAnimations() {
@@ -267,6 +434,7 @@ void updateAnimations() {
   battDisp = smoothTo(battDisp, battTarget, 0.10f);
   battVDisp = smoothTo(battVDisp, battVTarget, 0.10f);
   tempDisp = smoothTo(tempDisp, tempTarget, 0.10f);
+  dischargeDisp = smoothTo(dischargeDisp, dischargeTarget, 0.12f);
 }
 
 void setup() {
@@ -316,12 +484,19 @@ void setup() {
   battDisp = 60.0f;
   battVDisp = 11.8f;
   tempDisp = 32.0f;
+  dischargeDisp = 3.0f;
 
-  Serial.println("INV_MONITOR Page 1 UI started");
+  currentPage = 0;
+  lastPageSwitch = millis();
+
+  Serial.println("INV_MONITOR Page 1 + Page 2 UI started");
+  Serial.println("Auto rotate: 15 seconds");
 }
 
 void loop() {
   static uint32_t lastFrame = 0;
+
+  updatePageManager();
 
   // ~20 FPS
   if (millis() - lastFrame >= 50) {
@@ -329,6 +504,11 @@ void loop() {
 
     updateDemoTargets();
     updateAnimations();
-    drawPage1();
+
+    if (currentPage == 0) {
+      drawPage1();
+    } else {
+      drawPage2();
+    }
   }
 }
