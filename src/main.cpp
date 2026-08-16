@@ -58,19 +58,23 @@ void drawArcSegment(
   float endDeg,
   uint16_t color
 ) {
+  // Smooth rounded thick arc, compatible with TFT_eSprite.
   const float DEG = 0.01745329252f;
+  const int dotR = max(1, thickness / 2);
 
-  for (float a = startDeg; a <= endDeg; a += 2.2f) {
-    float r1 = radius - thickness / 2.0f;
-    float r2 = radius + thickness / 2.0f;
-
-    int x1 = cx + (int)(cosf(a * DEG) * r1);
-    int y1 = cy + (int)(sinf(a * DEG) * r1);
-    int x2 = cx + (int)(cosf(a * DEG) * r2);
-    int y2 = cy + (int)(sinf(a * DEG) * r2);
-
-    s.drawLine(x1, y1, x2, y2, color);
+  for (float a = startDeg; a <= endDeg; a += 1.25f) {
+    int x = cx + (int)roundf(cosf(a * DEG) * radius);
+    int y = cy + (int)roundf(sinf(a * DEG) * radius);
+    s.fillCircle(x, y, dotR, color);
   }
+
+  int sx = cx + (int)roundf(cosf(startDeg * DEG) * radius);
+  int sy = cy + (int)roundf(sinf(startDeg * DEG) * radius);
+  int ex = cx + (int)roundf(cosf(endDeg * DEG) * radius);
+  int ey = cy + (int)roundf(sinf(endDeg * DEG) * radius);
+
+  s.fillCircle(sx, sy, dotR, color);
+  s.fillCircle(ex, ey, dotR, color);
 }
 
 void drawGauge(
@@ -92,12 +96,12 @@ void drawGauge(
   p = clampf(p, 0.0f, 1.0f);
 
   // background arc
-  drawArcSegment(s, cx, cy, r, 5, startA, endA, C_GRID);
+  drawArcSegment(s, cx, cy, r, 7, startA, endA, C_GRID);
 
   // active arc
   float activeEnd = startA + span * p;
   if (activeEnd > startA + 1.0f) {
-    drawArcSegment(s, cx, cy, r, 5, startA, activeEnd, activeColor);
+    drawArcSegment(s, cx, cy, r, 7, startA, activeEnd, activeColor);
   }
 
   // center value
@@ -274,7 +278,7 @@ void setup() {
   tft.fillScreen(TFT_BLACK);
 
   // RGB565 palette
-  C_BG     = tft.color565(5, 8, 10);
+  C_BG     = TFT_BLACK;
   C_PANEL  = tft.color565(18, 22, 25);
   C_GRID   = tft.color565(55, 62, 66);
   C_WHITE  = tft.color565(245, 245, 245);
