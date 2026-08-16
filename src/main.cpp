@@ -279,15 +279,15 @@ void setup() {
 
   // RGB565 palette
   C_BG     = TFT_BLACK;
-  C_PANEL  = tft.color565(18, 22, 25);
-  C_GRID   = tft.color565(55, 62, 66);
-  C_WHITE  = tft.color565(245, 245, 245);
-  C_MUTED  = tft.color565(170, 180, 185);
-  C_GREEN  = tft.color565(70, 220, 80);
-  C_BLUE   = tft.color565(35, 160, 255);
-  C_ORANGE = tft.color565(255, 145, 20);
-  C_YELLOW = tft.color565(255, 215, 40);
-  C_RED    = tft.color565(245, 55, 55);
+  C_PANEL  = tft.color565(12, 12, 12);
+  C_GRID   = tft.color565(55, 55, 55);
+  C_WHITE  = tft.color565(255, 255, 255);
+  C_MUTED  = tft.color565(150, 150, 150);
+  C_GREEN  = tft.color565(0, 255, 0);
+  C_BLUE   = tft.color565(0, 170, 255);
+  C_ORANGE = tft.color565(255, 110, 0);
+  C_YELLOW = tft.color565(255, 255, 0);
+  C_RED    = tft.color565(255, 0, 0);
 
   ui.setColorDepth(16);
 
