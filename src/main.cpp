@@ -75,8 +75,20 @@ float weatherPressureTarget = 1008.0f;
 float weatherWindDisp = 0.0f;
 float weatherWindTarget = 3.4f;
 
+enum WeatherCondition {
+  WX_SUNNY,
+  WX_PARTLY_CLOUDY,
+  WX_CLOUDY,
+  WX_RAIN,
+  WX_HEAVY_RAIN,
+  WX_THUNDERSTORM,
+  WX_FOG
+};
+
+// Demo selection for now. Later the Weather API will set this automatically.
+WeatherCondition weatherCondition = WX_PARTLY_CLOUDY;
+
 const char* weatherCity = "EAINME";
-const char* weatherText = "PARTLY CLOUDY";
 const char* weatherDay  = "MONDAY";
 
 static inline float smoothTo(float current, float target, float k = 0.14f) {
@@ -825,24 +837,125 @@ void drawPage5() {
   ui.pushSprite(0, 0);
 }
 
-void drawSunCloudIcon(int cx, int cy) {
-  ui.fillCircle(cx - 18, cy - 10, 12, C_YELLOW);
+void drawCloudShape(int cx, int cy, uint16_t color) {
+  ui.fillCircle(cx - 13, cy + 2, 11, color);
+  ui.fillCircle(cx,      cy - 3, 15, color);
+  ui.fillCircle(cx + 15, cy + 3, 11, color);
+  ui.fillRoundRect(cx - 24, cy + 2, 50, 16, 8, color);
+}
 
-  for (int a = 0; a < 360; a += 45) {
-    float r = a * 0.01745329252f;
-    int x1 = cx - 18 + (int)(cosf(r) * 16);
-    int y1 = cy - 10 + (int)(sinf(r) * 16);
-    int x2 = cx - 18 + (int)(cosf(r) * 21);
-    int y2 = cy - 10 + (int)(sinf(r) * 21);
+void drawSunCore(int cx, int cy, float rotation) {
+  ui.fillCircle(cx, cy, 11, C_YELLOW);
+
+  for (int i = 0; i < 8; i++) {
+    float r = rotation + i * 0.78539816339f;
+    int x1 = cx + (int)roundf(cosf(r) * 15.0f);
+    int y1 = cy + (int)roundf(sinf(r) * 15.0f);
+    int x2 = cx + (int)roundf(cosf(r) * 20.0f);
+    int y2 = cy + (int)roundf(sinf(r) * 20.0f);
     ui.drawLine(x1, y1, x2, y2, C_YELLOW);
   }
-
-  ui.fillCircle(cx + 2,  cy + 3, 12, C_WHITE);
-  ui.fillCircle(cx + 16, cy - 1, 15, C_WHITE);
-  ui.fillCircle(cx + 30, cy + 5, 11, C_WHITE);
-  ui.fillRoundRect(cx - 8, cy + 3, 48, 17, 8, C_WHITE);
-  ui.drawFastHLine(cx - 5, cy + 20, 43, C_GRID);
 }
+
+void drawRainDrops(int cx, int cy, bool heavy) {
+  float t = millis() * 0.001f;
+  int count = heavy ? 7 : 5;
+  int spacing = heavy ? 9 : 12;
+
+  for (int i = 0; i < count; i++) {
+    int phase = ((int)(t * (heavy ? 28.0f : 20.0f)) + i * 7) % 18;
+    int x = cx - ((count - 1) * spacing) / 2 + i * spacing;
+    int y = cy + 20 + phase;
+
+    ui.drawLine(x, y, x - 3, y + (heavy ? 8 : 6), C_BLUE);
+    if (heavy) ui.drawLine(x + 1, y, x - 2, y + 8, C_BLUE);
+  }
+}
+
+void drawFogLines(int cx, int cy) {
+  float t = millis() * 0.001f;
+
+  for (int i = 0; i < 3; i++) {
+    int shift = (int)roundf(sinf(t * 1.1f + i * 1.7f) * 6.0f);
+    int y = cy + 19 + i * 9;
+    ui.drawFastHLine(cx - 31 + shift, y, 48, C_MUTED);
+    ui.drawFastHLine(cx + 20 + shift, y, 13, C_MUTED);
+  }
+}
+
+const char* getWeatherText() {
+  switch (weatherCondition) {
+    case WX_SUNNY:         return "SUNNY";
+    case WX_PARTLY_CLOUDY: return "PARTLY CLOUDY";
+    case WX_CLOUDY:        return "CLOUDY";
+    case WX_RAIN:          return "RAIN";
+    case WX_HEAVY_RAIN:    return "HEAVY RAIN";
+    case WX_THUNDERSTORM:  return "THUNDERSTORM";
+    case WX_FOG:           return "FOG";
+    default:               return "WEATHER";
+  }
+}
+
+void drawAnimatedWeatherIcon(int cx, int cy) {
+  float t = millis() * 0.001f;
+  float rotation = t * 0.65f;
+  int drift = (int)roundf(sinf(t * 1.25f) * 3.0f);
+  int bob = (int)roundf(sinf(t * 1.05f) * 1.0f);
+
+  switch (weatherCondition) {
+    case WX_SUNNY:
+      // Slowly rotating sun rays + tiny breathing motion.
+      drawSunCore(cx, cy, rotation);
+      break;
+
+    case WX_PARTLY_CLOUDY:
+      // Rotating sun behind a gently floating cloud.
+      drawSunCore(cx - 18, cy - 11, rotation);
+      drawCloudShape(cx + 8 + drift, cy + 5 + bob, C_WHITE);
+      break;
+
+    case WX_CLOUDY:
+      // Two cloud layers drifting at different speeds.
+      drawCloudShape(cx - 10 - drift, cy - 6, C_MUTED);
+      drawCloudShape(cx + 8 + drift, cy + 8 + bob, C_WHITE);
+      break;
+
+    case WX_RAIN:
+      // Floating cloud + animated blue raindrops.
+      drawCloudShape(cx + drift, cy - 8 + bob, C_WHITE);
+      drawRainDrops(cx, cy, false);
+      break;
+
+    case WX_HEAVY_RAIN:
+      // Darker cloud + denser/faster rain.
+      drawCloudShape(cx + drift, cy - 8 + bob, C_MUTED);
+      drawRainDrops(cx, cy, true);
+      break;
+
+    case WX_THUNDERSTORM: {
+      // Cloud + rain + periodic vivid lightning flash.
+      drawCloudShape(cx + drift, cy - 9 + bob, C_MUTED);
+      drawRainDrops(cx, cy + 1, true);
+
+      bool flash = ((millis() / 180UL) % 9UL) == 0UL;
+      uint16_t bolt = flash ? C_WHITE : C_YELLOW;
+
+      int bx = cx + 4;
+      int by = cy + 10;
+      ui.drawLine(bx, by, bx - 7, by + 14, bolt);
+      ui.drawLine(bx - 7, by + 14, bx + 1, by + 14, bolt);
+      ui.drawLine(bx + 1, by + 14, bx - 7, by + 29, bolt);
+      break;
+    }
+
+    case WX_FOG:
+      // Slow cloud drift with independently moving fog bands.
+      drawCloudShape(cx + drift, cy - 11 + bob, C_MUTED);
+      drawFogLines(cx, cy);
+      break;
+  }
+}
+
 
 void drawWeatherMetric(int x, int y, int w,
                        const char *label,
@@ -886,7 +999,7 @@ void drawPage6() {
   ui.setTextColor(C_BLUE, C_BG);
   ui.drawString(weatherCity, 228, 35);
 
-  drawSunCloudIcon(63, 78);
+  drawAnimatedWeatherIcon(63, 78);
 
   char buf[32];
 
@@ -903,7 +1016,7 @@ void drawPage6() {
   ui.setTextDatum(MC_DATUM);
   ui.setTextFont(1);
   ui.setTextColor(C_GREEN, C_BG);
-  ui.drawString(weatherText, 120, 116);
+  ui.drawString(getWeatherText(), 120, 116);
 
   ui.drawFastHLine(8, 128, 224, C_GRID);
 
